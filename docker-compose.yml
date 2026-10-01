@@ -1,7 +1,6 @@
 # Local Moodle instance for development (per-person, not shared).
 # Postgres for the app itself is hosted separately via a cloud provider
 # (see .env DATABASE_URL) — this compose file is Moodle + its own DB only.
-version: "3.8"
 
 services:
   moodle-db:
@@ -16,7 +15,7 @@ services:
       - moodle_db_data:/var/lib/mysql
 
   moodle:
-    image: bitnami/moodle:latest
+    image: bitnamilegacy/moodle:latest
     restart: unless-stopped
     depends_on:
       - moodle-db

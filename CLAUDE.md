@@ -24,7 +24,9 @@
 
 ## Current state (update this as work progresses)
 - [x] Repo skeleton, FastAPI app, LangGraph state/graph wiring (stubs), Moodle REST client, 4 agent stubs
-- [ ] Ollama / Docker installed and verified on dev machines
+- [x] Docker installed and verified (Docker Desktop, v29.8.1 + Compose v5.5.1)
+- [x] Ollama installed and verified (v0.20.6, llama3.1 + llama2 available)
+- [x] Local Moodle instance running via Docker (bitnamilegacy/moodle, since bitnami/moodle requires a paid plan now)
 - [ ] ChromaDB ingestion pipeline for Tutor Agent
 - [ ] Bloom's-taxonomy quiz generation for Assessment Agent
 - [ ] Mentor Agent gap-detection logic
