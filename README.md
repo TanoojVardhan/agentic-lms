@@ -21,8 +21,7 @@ Full technical spec: see the project doc `gemini-code-1790865916533.md` (one lev
 ## Getting started
 ```bash
 cd backend
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r ../requirements.txt
+pip install -r ../requirements.txt   # installed directly, no virtualenv
 cp ../.env.example ../.env   # fill in your keys
 uvicorn app.main:app --reload
 ```
