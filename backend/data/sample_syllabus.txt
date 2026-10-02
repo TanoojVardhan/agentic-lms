@@ -1,0 +1,58 @@
+Course: Introduction to Operating Systems (CS301)
+
+Module 1: Processes and Threads
+A process is an instance of a program in execution. Each process has its own
+address space, including code, data, and a stack, and is managed by the
+operating system's process control block (PCB). A thread is a lightweight
+unit of execution within a process; multiple threads in the same process
+share the same address space but have their own stack and register state.
+Context switching between processes is more expensive than switching between
+threads of the same process, because the OS must also switch memory maps
+(page tables) and flush the TLB.
+
+Module 2: CPU Scheduling
+The scheduler decides which ready process or thread runs next on the CPU.
+Common scheduling algorithms include First-Come-First-Served (FCFS), which
+is simple but can cause long wait times for short jobs behind long ones (the
+convoy effect); Shortest Job First (SJF), which minimizes average waiting
+time but requires knowing job lengths in advance; Round Robin, which gives
+each process a fixed time quantum and is well suited to interactive systems;
+and priority scheduling, which can suffer from starvation unless combined
+with aging, where a process's priority increases the longer it waits.
+
+Module 3: Synchronization and Deadlocks
+When multiple threads access shared data, race conditions can occur unless
+access is synchronized. Mutexes (mutual exclusion locks) allow only one
+thread to hold the lock at a time; semaphores generalize this to allow a
+fixed count of concurrent holders, and are often used for both mutual
+exclusion and signaling between threads. A deadlock arises when a set of
+processes are each waiting for a resource held by another process in the
+set, so none can proceed. The four necessary conditions for deadlock are
+mutual exclusion, hold-and-wait, no preemption, and circular wait; breaking
+any one of these prevents deadlock. Common strategies are deadlock
+prevention (structurally ruling out one condition), avoidance (e.g. the
+Banker's Algorithm, which only grants requests that keep the system in a
+safe state), and detection-and-recovery (allow deadlocks to occur, then
+detect and break them).
+
+Module 4: Memory Management
+Virtual memory gives each process the illusion of a large, contiguous
+address space, backed by physical memory and disk. Paging divides memory
+into fixed-size pages and frames, avoiding external fragmentation but
+introducing internal fragmentation within the last page of a process.
+Page replacement algorithms decide which page to evict when memory is full:
+FIFO is simple but suffers from Belady's anomaly (more frames can sometimes
+cause more page faults); LRU (Least Recently Used) approximates optimal
+replacement by evicting the page unused for the longest time, and is
+usually approximated in practice (e.g. via a clock/second-chance algorithm)
+rather than implemented exactly, since exact LRU requires expensive
+bookkeeping on every memory access.
+
+Module 5: File Systems
+A file system organizes how data is stored and retrieved on persistent
+storage. Inodes store a file's metadata (permissions, size, timestamps) and
+pointers to its data blocks, separately from the file's name, which is held
+in a directory entry — this separation is what allows hard links. Journaling
+file systems (e.g. ext4) write intended changes to a log before applying
+them, so that after a crash the system can replay or discard incomplete
+operations instead of leaving the file system in an inconsistent state.

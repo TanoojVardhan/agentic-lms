@@ -12,12 +12,14 @@ langchain-community>=0.3
 
 # RAG / vector store
 chromadb>=0.5
-sentence-transformers>=3.0
+# sentence-transformers removed — Tutor Agent embeddings use Ollama
+# (nomic-embed-text) instead, see CLAUDE.md implementation notes
 
 # LLM backends (no OpenAI/Anthropic — Ollama, OpenRouter via OpenAI-compatible client, Gemini)
 ollama>=0.3
 openai>=1.40          # used only as an OpenAI-compatible client for OpenRouter, not for OpenAI itself
-google-generativeai>=0.8
+# google-generativeai removed — Gemini calls go through httpx directly
+# (app/tools/llm_client.py), avoiding the google-api-python-client chain
 
 # Database
 sqlalchemy>=2.0

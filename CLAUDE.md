@@ -27,9 +27,13 @@
 - [x] Docker installed and verified (Docker Desktop, v29.8.1 + Compose v5.5.1)
 - [x] Ollama installed and verified (v0.20.6, llama3.1 + llama2 available)
 - [x] Local Moodle instance running via Docker (bitnamilegacy/moodle, since bitnami/moodle requires a paid plan now)
-- [ ] ChromaDB ingestion pipeline for Tutor Agent
+- [x] ChromaDB ingestion pipeline for Tutor Agent (Ollama embeddings, not sentence-transformers/torch — see note below)
 - [ ] Bloom's-taxonomy quiz generation for Assessment Agent
 - [ ] Mentor Agent gap-detection logic
 - [ ] Faculty Copilot drafting logic
 - [ ] Moodle fake-data seed script (`moodle_seed/`)
 - [ ] Next.js frontend (after backend works)
+
+## Implementation notes
+- **Tutor Agent embeddings use Ollama (`nomic-embed-text`), not `sentence-transformers`/HuggingFace.** `requirements.txt` still lists `sentence-transformers`, but it's unused — pulling it installs `torch` (~550MB+ with CUDA deps), and the model weights for any HF-based embedder need a download from huggingface.co or an S3 bucket, both of which can be blocked on restrictive networks. Ollama was already a locked-in local LLM backend, so its embeddings endpoint covers this for free with no extra heavy deps. Run `ollama pull nomic-embed-text` once before using the Tutor Agent. If this turns out to be a problem (e.g. embedding quality), swapping back to `sentence-transformers` just means reimplementing `app/tools/llm_client.embed()`.
+- **Gemini calls go through `httpx` directly, not the `google-generativeai` SDK.** That SDK pulls in `google-api-python-client` (16MB+) and a dependency chain built for other Google APIs (Drive, Sheets, OAuth) this project doesn't touch. `_generate_gemini()` in `app/tools/llm_client.py` now POSTs straight to `generativelanguage.googleapis.com`'s REST endpoint — same capability, far lighter. `requirements.txt` updated to drop `google-generativeai`.

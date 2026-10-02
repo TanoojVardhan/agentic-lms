@@ -60,12 +60,52 @@ def _generate_openrouter(prompt: str, system: str | None) -> str:
 
 
 def _generate_gemini(prompt: str, system: str | None) -> str:
-    import google.generativeai as genai
+    """Calls Gemini's REST API directly via httpx instead of the
+    `google-generativeai` SDK. That SDK pulls in `google-api-python-client`
+    (16MB+) and a long dependency chain mostly meant for other Google APIs
+    (Drive, Sheets, OAuth flows) that this project doesn't use — a plain
+    REST call does the same job with a dependency we already have (httpx).
+    """
+    import httpx
 
-    genai.configure(api_key=settings.gemini_api_key)
-    model = genai.GenerativeModel(
-        settings.gemini_model,
-        system_instruction=system,
+    url = (
+        "https://generativelanguage.googleapis.com/v1beta/models/"
+        f"{settings.gemini_model}:generateContent"
     )
-    response = model.generate_content(prompt)
-    return response.text
+    body: dict = {"contents": [{"role": "user", "parts": [{"text": prompt}]}]}
+    if system:
+        body["systemInstruction"] = {"parts": [{"text": system}]}
+
+    response = httpx.post(
+        url,
+        params={"key": settings.gemini_api_key},
+        json=body,
+        timeout=60.0,
+    )
+    response.raise_for_status()
+    data = response.json()
+    try:
+        return data["candidates"][0]["content"]["parts"][0]["text"]
+    except (KeyError, IndexError) as exc:
+        raise RuntimeError(f"Unexpected Gemini response shape: {data}") from exc
+
+
+def embed(text: str) -> list[float]:
+    """Embed a single string of text for vector search.
+
+    Uses Ollama's embedding models (local, free) rather than OpenAI/Anthropic
+    embeddings, consistent with this project's LLM-backend decision. Pull a
+    model first: `ollama pull nomic-embed-text`.
+    """
+    import ollama
+
+    client = ollama.Client(host=settings.ollama_host)
+    response = client.embeddings(model=settings.ollama_embed_model, prompt=text)
+    return response["embedding"]
+
+
+def embed_batch(texts: list[str]) -> list[list[float]]:
+    """Embed multiple strings. Ollama's embeddings endpoint is single-input,
+    so this loops — fine for ingestion-time batch sizes in a capstone project,
+    revisit if ingesting large corpora."""
+    return [embed(t) for t in texts]

@@ -23,9 +23,16 @@ class Settings(BaseSettings):
     openrouter_model: str = ""
 
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-1.5-flash"
+    gemini_model: str = "gemini-2.5-flash"
 
     default_llm_backend: str = "gemini"  # ollama | openrouter | gemini
+
+    # Tutor Agent / RAG
+    chroma_persist_dir: str = "./chroma_db"
+    ollama_embed_model: str = "nomic-embed-text"  # `ollama pull nomic-embed-text` first
+    rag_chunk_size: int = 512
+    rag_chunk_overlap: int = 64
+    rag_top_k: int = 4
 
 
 settings = Settings()
