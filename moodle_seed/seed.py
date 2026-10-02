@@ -89,30 +89,44 @@ def load_students_csv() -> list[dict]:
         return list(csv.DictReader(f))
 
 
+BATCH_SIZE = 100  # keeps request param count well under PHP's default max_input_vars
+
+
+def chunked(seq, size):
+    for i in range(0, len(seq), size):
+        yield seq[i : i + size]
+
+
 def create_students(students: list[dict]) -> list[int]:
-    print(f"Creating {len(students)} fake student accounts...")
-    params = {}
-    for i, s in enumerate(students):
-        params[f"users[{i}][username]"] = s["username"]
-        params[f"users[{i}][password]"] = s["password"]
-        params[f"users[{i}][firstname]"] = s["firstname"]
-        params[f"users[{i}][lastname]"] = s["lastname"]
-        params[f"users[{i}][email]"] = s["email"]
-    result = call("core_user_create_users", **params)
-    user_ids = [u["id"] for u in result]
-    print(f"  -> created user ids: {user_ids}")
+    print(f"Creating {len(students)} fake student accounts (in batches of {BATCH_SIZE})...")
+    user_ids = []
+    for batch_num, batch in enumerate(chunked(students, BATCH_SIZE), start=1):
+        params = {}
+        for i, s in enumerate(batch):
+            params[f"users[{i}][username]"] = s["username"]
+            params[f"users[{i}][password]"] = s["password"]
+            params[f"users[{i}][firstname]"] = s["firstname"]
+            params[f"users[{i}][lastname]"] = s["lastname"]
+            params[f"users[{i}][email]"] = s["email"]
+        result = call("core_user_create_users", **params)
+        batch_ids = [u["id"] for u in result]
+        user_ids.extend(batch_ids)
+        print(f"  batch {batch_num}: created {len(batch_ids)} users")
+    print(f"  -> total created: {len(user_ids)}")
     return user_ids
 
 
 def enrol_students(course_id: int, user_ids: list[int]):
-    print(f"Enrolling {len(user_ids)} students into course {course_id}...")
-    params = {}
-    for i, uid in enumerate(user_ids):
-        params[f"enrolments[{i}][roleid]"] = STUDENT_ROLE_ID
-        params[f"enrolments[{i}][userid]"] = uid
-        params[f"enrolments[{i}][courseid]"] = course_id
-    call("enrol_manual_enrol_users", **params)
-    print("  -> enrolled")
+    print(f"Enrolling {len(user_ids)} students into course {course_id} (in batches of {BATCH_SIZE})...")
+    for batch_num, batch in enumerate(chunked(user_ids, BATCH_SIZE), start=1):
+        params = {}
+        for i, uid in enumerate(batch):
+            params[f"enrolments[{i}][roleid]"] = STUDENT_ROLE_ID
+            params[f"enrolments[{i}][userid]"] = uid
+            params[f"enrolments[{i}][courseid]"] = course_id
+        call("enrol_manual_enrol_users", **params)
+        print(f"  batch {batch_num}: enrolled {len(batch)} students")
+    print("  -> all enrolled")
 
 
 def main():
