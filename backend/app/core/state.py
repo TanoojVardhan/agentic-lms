@@ -21,6 +21,7 @@ class AgentState(TypedDict, total=False):
     # Assessment Agent
     quiz_topic: Optional[str]
     bloom_level: Optional[str]
+    num_questions: Optional[int]
     generated_quiz: Optional[Dict[str, Any]]
     student_submission: Optional[str]
     evaluation_result: Optional[Dict[str, Any]]

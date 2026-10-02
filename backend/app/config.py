@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     openrouter_model: str = ""
 
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-2.5-flash"
+    gemini_model: str = "gemini-flash-lite-latest"
 
     default_llm_backend: str = "gemini"  # ollama | openrouter | gemini
 
