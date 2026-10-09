@@ -8,3 +8,5 @@ node_modules/
 chroma_db/
 *.sqlite3
 .DS_Store
+
+backend/data/deep-learning/

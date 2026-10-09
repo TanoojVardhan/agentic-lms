@@ -17,6 +17,8 @@ class AgentState(TypedDict, total=False):
     student_query: Optional[str]
     retrieved_chunks: Optional[List[Dict[str, Any]]]
     tutor_response: Optional[str]
+    mode: Optional[str]          # "strict" (default) or "hybrid" — set per-request
+    grounded: Optional[bool]     # True if tutor_response came from course material
 
     # Assessment Agent
     quiz_topic: Optional[str]
@@ -24,6 +26,7 @@ class AgentState(TypedDict, total=False):
     num_questions: Optional[int]
     generated_quiz: Optional[Dict[str, Any]]
     student_submission: Optional[str]
+    submissions: Optional[List[Dict[str, Any]]]  # graded quiz answers
     evaluation_result: Optional[Dict[str, Any]]
 
     # Learning Path & Mentor Agent

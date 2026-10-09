@@ -19,10 +19,12 @@ async def ask(request: TutorAskRequest) -> TutorAskResponse:
         "course_id": request.course_id,
         "student_id": request.student_id,
         "llm_backend": request.llm_backend,
+        "mode": request.mode,
     }
     result_state = tutor_agent.run(state)
 
     return TutorAskResponse(
         answer=result_state.get("tutor_response", ""),
         sources=[RetrievedChunk(**c) for c in result_state.get("retrieved_chunks", [])],
+        grounded=result_state.get("grounded", True),
     )

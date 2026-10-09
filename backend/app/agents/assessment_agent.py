@@ -52,6 +52,33 @@ def _extract_json(raw: str):
     return json.loads(text)
 
 
+def _normalize_question(q, default_level: str):
+    """LLMs often drift from the requested JSON keys (e.g. "level" instead of
+    "bloom_level"). Accept common variants and fall back to the level we asked
+    for; return None if the item is too broken to use."""
+    if not isinstance(q, dict):
+        return None
+    question = q.get("question")
+    options = q.get("options")
+    correct = q.get("correct_answer") or q.get("answer") or q.get("correct")
+    if not question or not isinstance(options, list) or not options or not correct:
+        return None
+    level = (
+        q.get("bloom_level") or q.get("level") or q.get("bloom")
+        or q.get("bloomLevel") or default_level
+    )
+    level = str(level).strip().lower()
+    if level not in BLOOM_LEVELS:
+        level = default_level
+    return {
+        "question": str(question),
+        "options": [str(o) for o in options],
+        "correct_answer": str(correct),
+        "bloom_level": level,
+        "explanation": str(q.get("explanation") or ""),
+    }
+
+
 def run(state: AgentState) -> AgentState:
     course_id = state.get("course_id")
     topic = state.get("quiz_topic")
@@ -97,6 +124,118 @@ def run(state: AgentState) -> AgentState:
         state["generated_quiz"] = {"questions": [], "raw_output": raw}
         return state
 
-    state["generated_quiz"] = {"questions": questions}
+    # Some models wrap the list: {"questions": [...]}
+    if isinstance(questions, dict):
+        questions = questions.get("questions", [])
+    if not isinstance(questions, list):
+        questions = []
+
+    cleaned = []
+    for i, q in enumerate(questions):
+        default_level = levels_wanted[i] if i < len(levels_wanted) else levels_wanted[-1]
+        item = _normalize_question(q, default_level)
+        if item:
+            cleaned.append(item)
+    if len(cleaned) < num_questions:
+        errors.append(
+            f"assessment_agent: requested {num_questions} questions, got {len(cleaned)} usable"
+        )
+        state["errors"] = errors
+
+    state["generated_quiz"] = {"questions": cleaned}
     state["retrieved_chunks"] = chunks
+    return state
+
+
+# ---------------------------------------------------------------------------
+# Grading
+# ---------------------------------------------------------------------------
+
+FEEDBACK_SYSTEM_PROMPT = (
+    "You are a supportive course tutor giving feedback on a wrong quiz answer. "
+    "Using ONLY the course material excerpts provided, explain in 2-3 short "
+    "sentences why the student's answer is incorrect and why the correct "
+    "answer is right. Do not invent facts outside the excerpts."
+)
+
+
+def _resolve_answer(student_answer: str, options: list[str]) -> str:
+    """Accept either the option text or a letter (A/B/C/D) and return the text."""
+    ans = (student_answer or "").strip()
+    if len(ans) == 1 and ans.upper() in "ABCDEF":
+        idx = ord(ans.upper()) - ord("A")
+        if idx < len(options):
+            return options[idx]
+    return ans
+
+
+def _norm(s: str) -> str:
+    return " ".join((s or "").split()).casefold()
+
+
+def grade(state: AgentState) -> AgentState:
+    """Grade a list of submitted quiz answers.
+
+    Correct answers are marked with no LLM call. For wrong answers, retrieve
+    course material for the question and ask the LLM for short grounded
+    feedback; if that fails, fall back to the question's stored explanation.
+    """
+    course_id = state.get("course_id")
+    submissions = state.get("submissions") or []
+    errors = state.get("errors") or []
+
+    results = []
+    score = 0
+    for sub in submissions:
+        options = sub.get("options") or []
+        chosen = _resolve_answer(sub.get("student_answer", ""), options)
+        correct = sub.get("correct_answer", "")
+        is_correct = _norm(chosen) == _norm(correct)
+
+        if is_correct:
+            score += 1
+            feedback = "Correct."
+        else:
+            feedback = sub.get("explanation") or f"The correct answer is: {correct}"
+            try:
+                chunks = query_course_vectorstore(
+                    query=sub.get("question", ""), course_id=course_id, k=3
+                )
+                if chunks:
+                    context = "\n\n".join(f"[{c['source']}] {c['text']}" for c in chunks)
+                    prompt = (
+                        f"Course material excerpts:\n\n{context}\n\n"
+                        f"Question: {sub.get('question')}\n"
+                        f"Student's answer: {chosen}\n"
+                        f"Correct answer: {correct}\n\n"
+                        f"Explain the mistake briefly."
+                    )
+                    feedback = llm_client.generate(
+                        prompt,
+                        backend=state.get("llm_backend"),
+                        system=FEEDBACK_SYSTEM_PROMPT,
+                    ).strip()
+            except Exception as e:  # never let feedback failure block the score
+                errors.append(f"assessment_agent.grade: feedback unavailable ({e})")
+
+        results.append(
+            {
+                "question": sub.get("question", ""),
+                "student_answer": chosen,
+                "correct_answer": correct,
+                "is_correct": is_correct,
+                "bloom_level": sub.get("bloom_level"),
+                "feedback": feedback,
+            }
+        )
+
+    total = len(results)
+    state["evaluation_result"] = {
+        "score": score,
+        "total": total,
+        "percentage": round(100 * score / total, 1) if total else 0.0,
+        "results": results,
+    }
+    if errors:
+        state["errors"] = errors
     return state

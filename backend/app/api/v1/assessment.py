@@ -2,7 +2,12 @@
 from fastapi import APIRouter
 
 from app.agents import assessment_agent
-from app.schemas.assessment import QuizGenerateRequest, QuizGenerateResponse
+from app.schemas.assessment import (
+    QuizGenerateRequest,
+    QuizGenerateResponse,
+    QuizGradeRequest,
+    QuizGradeResponse,
+)
 
 router = APIRouter(prefix="/assessment", tags=["assessment"])
 
@@ -24,3 +29,14 @@ async def generate_quiz(req: QuizGenerateRequest):
     result = assessment_agent.run(state)
     quiz = result.get("generated_quiz", {})
     return QuizGenerateResponse(topic=req.topic, questions=quiz.get("questions", []))
+
+
+@router.post("/grade", response_model=QuizGradeResponse)
+async def grade_quiz(req: QuizGradeRequest):
+    state = {
+        "course_id": req.course_id,
+        "submissions": [s.model_dump() for s in req.submissions],
+        "llm_backend": req.llm_backend,
+    }
+    result = assessment_agent.grade(state)
+    return QuizGradeResponse(**result["evaluation_result"])
