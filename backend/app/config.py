@@ -10,6 +10,10 @@ class Settings(BaseSettings):
     # Database
     database_url: str = "postgresql+asyncpg://user:password@localhost:5432/agentic_lms"
 
+    # App records (quizzes, attempts, results). SQLite file by default; any
+    # Postgres works too, e.g. postgresql+psycopg2://user:pass@host:5432/db
+    app_db_url: str = "sqlite:///./agentic_lms.db"
+
     # Moodle
     moodle_base_url: str = "http://localhost:8080"
     moodle_ws_token: str = ""
@@ -38,6 +42,13 @@ class Settings(BaseSettings):
     # mode falls back to the LLM's general knowledge (clearly labeled).
     # Approximate for cosine-like embeddings; tune by testing real queries.
     rag_hybrid_distance_threshold: float = 1.0
+
+    # Code runner (Assessment Agent code questions + /api/v1/code playground)
+    # "docker": sandboxed, needs `docker build -t agentic-lms-runner backend/sandbox`
+    # "local": runs on this machine with installed compilers; dev/tests only, NOT isolated
+    code_runner_mode: str = "docker"
+    code_runner_image: str = "agentic-lms-runner"
+    code_time_limit_s: float = 2.0
 
 
 settings = Settings()

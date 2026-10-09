@@ -24,6 +24,9 @@ class AgentState(TypedDict, total=False):
     quiz_topic: Optional[str]
     bloom_level: Optional[str]
     num_questions: Optional[int]
+    question_type: Optional[str]   # "mcq" (default), "numeric" or "code"
+    suggest_fix: Optional[bool]    # code grading: return an LLM-suggested fix
+    seed: Optional[int]            # per-student randomization for numeric questions
     generated_quiz: Optional[Dict[str, Any]]
     student_submission: Optional[str]
     submissions: Optional[List[Dict[str, Any]]]  # graded quiz answers

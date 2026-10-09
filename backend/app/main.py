@@ -1,7 +1,7 @@
 """FastAPI application entrypoint — Agentic LMS backend."""
 from fastapi import FastAPI
 
-from app.api.v1 import tutor, assessment, mentor, faculty
+from app.api.v1 import tutor, assessment, mentor, faculty, code
 from app.config import settings
 
 app = FastAPI(
@@ -14,6 +14,7 @@ app.include_router(tutor.router, prefix="/api/v1")
 app.include_router(assessment.router, prefix="/api/v1")
 app.include_router(mentor.router, prefix="/api/v1")
 app.include_router(faculty.router, prefix="/api/v1")
+app.include_router(code.router, prefix="/api/v1")
 
 
 @app.get("/health")

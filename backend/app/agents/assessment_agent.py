@@ -1,4 +1,4 @@
-"""Assessment Agent — Bloom's-taxonomy quiz generation (grading comes later).
+"""Assessment Agent — quiz generation and grading (MCQ, numeric, code).
 
 Mirrors the Tutor Agent's pattern: retrieve grounded context from the course's
 ChromaDB collection, then ask the LLM to produce quiz questions strictly from
@@ -12,6 +12,8 @@ import re
 from app.core.state import AgentState
 from app.tools import llm_client
 from app.tools.vector_store import query_course_vectorstore
+from app.tools.numeric_questions import check_numeric, generate_numeric
+from app.agents.assessment_code import generate_code_questions, grade_code
 
 BLOOM_LEVELS = ["remember", "understand", "apply", "analyze", "evaluate", "create"]
 
@@ -93,14 +95,41 @@ def run(state: AgentState) -> AgentState:
         state["generated_quiz"] = {"questions": []}
         return state
 
+    # Numeric questions: answers come from formulas, so no retrieval or LLM.
+    if (state.get("question_type") or "mcq") == "numeric":
+        state["generated_quiz"] = {
+            "questions": generate_numeric(topic, num_questions, seed=state.get("seed"))
+        }
+        state["retrieved_chunks"] = []
+        return state
+
     chunks = query_course_vectorstore(query=topic, course_id=course_id, k=6)
+    if not chunks:
+        # Without course material the LLM would invent questions; refuse instead.
+        errors.append(f"assessment_agent: no course material indexed for course_id={course_id!r}")
+        state["errors"] = errors
+        state["generated_quiz"] = {"questions": []}
+        state["retrieved_chunks"] = []
+        return state
     context = "\n\n".join(f"[{c['source']}] {c['text']}" for c in chunks)
+
+    # Code questions: problem + tests + reference solution, validated by running it.
+    if (state.get("question_type") or "mcq") == "code":
+        questions, code_errors = generate_code_questions(
+            topic, num_questions, context, state.get("llm_backend")
+        )
+        if code_errors:
+            errors.extend(code_errors)
+            state["errors"] = errors
+        state["generated_quiz"] = {"questions": questions}
+        state["retrieved_chunks"] = chunks
+        return state
 
     levels_wanted = _bloom_levels_for(bloom_level, num_questions)
     level_instructions = ", ".join(levels_wanted)
 
     prompt = (
-        f"COURSE MATERIAL:\n{context if context else '(no material found — say so)'}\n\n"
+        f"COURSE MATERIAL:\n{context}\n\n"
         f"TASK: Write exactly {num_questions} multiple-choice quiz questions about "
         f"'{topic}', using ONLY the course material above.\n"
         f"Target these Bloom's Taxonomy levels, in this order, one per question: "
@@ -188,8 +217,38 @@ def grade(state: AgentState) -> AgentState:
     score = 0
     for sub in submissions:
         options = sub.get("options") or []
-        chosen = _resolve_answer(sub.get("student_answer", ""), options)
         correct = sub.get("correct_answer", "")
+
+        # Code: run in the sandbox against the tests; failures get a verified fix.
+        if (sub.get("question_type") or "mcq") == "code":
+            graded, code_errors = grade_code(
+                sub, state.get("llm_backend"), state.get("suggest_fix", True)
+            )
+            errors.extend(code_errors)
+            score += int(graded["is_correct"])
+            results.append(graded)
+            continue
+
+        # Numeric: exact/tolerance comparison, worked formula as feedback, no LLM.
+        if (sub.get("question_type") or "mcq") == "numeric":
+            chosen = str(sub.get("student_answer", "")).strip()
+            is_correct = check_numeric(chosen, correct, sub.get("tolerance") or 0.0)
+            score += int(is_correct)
+            results.append(
+                {
+                    "question": sub.get("question", ""),
+                    "student_answer": chosen,
+                    "correct_answer": correct,
+                    "is_correct": is_correct,
+                    "bloom_level": sub.get("bloom_level"),
+                    "feedback": "Correct." if is_correct else (
+                        f"Not quite. {sub.get('explanation') or 'The correct answer is ' + correct}"
+                    ),
+                }
+            )
+            continue
+
+        chosen = _resolve_answer(sub.get("student_answer", ""), options)
         is_correct = _norm(chosen) == _norm(correct)
 
         if is_correct:

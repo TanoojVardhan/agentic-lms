@@ -10,3 +10,10 @@ chroma_db/
 .DS_Store
 
 backend/data/deep-learning/
+
+# local env copy without the dot, and a stray Chroma dir
+backend/env
+chroma_data/
+
+# local app database (quizzes, attempts)
+*.db
